@@ -10,12 +10,13 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 if (!endpointSecret) {
-  return res.status(500).send("Webhook secret not configured");
+  console.error("Webhook secret not configured");
+  process.exit(1);
 }
 
 app.use(cors());
 app.use(express.json());
-app.use("/webhook", bodyParser.raw({ type: "application/json" })); // For Stripe webhooks only
+app.use("/webhook", bodyParser.raw({ type: "application/json" }));
 
 const OTHER_BACKEND_BASE = "https://tms-server-rosy.vercel.app/";
 const FASTFOREX_API_KEY = process.env.FASTFOREX_API_KEY;
@@ -23,31 +24,28 @@ const FASTFOREX_API_KEY = process.env.FASTFOREX_API_KEY;
 // 1️⃣ Create Stripe Checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { civilNIC, fineId } = req.body;
-
   if (!civilNIC || !fineId) {
     return res.status(400).json({ error: "Missing civilNIC or fineId" });
   }
 
   try {
-    // Get fine
-    const fineRes = await axios.get(`${OTHER_BACKEND_BASE}/policeIssueFine/${fineId}`);
+    const fineRes = await axios.get(`${OTHER_BACKEND_BASE}policeIssueFine/${fineId}`);
     const fine = fineRes.data.data;
 
     if (fine.civilNIC !== civilNIC) {
       return res.status(403).json({ error: "Not authorized to pay this fine" });
     }
 
-    // Get amount in LKR
-    const fineMgmtRes = await axios.get(`${OTHER_BACKEND_BASE}/fine/${fine.fineManagementId}`);
+    const fineMgmtRes = await axios.get(`${OTHER_BACKEND_BASE}fine/${fine.fineManagementId}`);
     const lkrAmount = parseFloat(fineMgmtRes.data.data.fine);
 
-    // Convert to USD using FastForex
-    const fxRes = await axios.get(`https://api.fastforex.io/fetch-one?from=LKR&to=USD&api_key=${FASTFOREX_API_KEY}`);
+    const fxRes = await axios.get(
+      `https://api.fastforex.io/fetch-one?from=LKR&to=USD&api_key=${FASTFOREX_API_KEY}`
+    );
     const rate = fxRes.data.result.USD;
     const usdAmount = (lkrAmount * rate).toFixed(2);
     const amountInCents = Math.round(usdAmount * 100);
 
-    // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -66,7 +64,7 @@ app.post("/create-checkout-session", async (req, res) => {
       mode: "payment",
       metadata: { fineId, civilNIC },
       success_url: "https://tms-gamma-brown.vercel.app/#/payment-success",
-      cancel_url: "https://tms-gamma-brown.vercel.app/#/payment-cancelled",      
+      cancel_url: "https://tms-gamma-brown.vercel.app/#/payment-cancelled",
     });
 
     res.status(200).json({
@@ -85,11 +83,7 @@ app.post("/webhook", async (req, res) => {
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      endpointSecret
-    );
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -97,15 +91,25 @@ app.post("/webhook", async (req, res) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const { fineId, civilNIC } = session.metadata;
+    const { fineId } = session.metadata;
 
     try {
-      await axios.put(`${OTHER_BACKEND_BASE}policeIssueFine/${fineId}`, {
-        isPaid: true,
-      });
-      console.log(`✅ Fine ${fineId} marked as paid`);
+      const response = await axios.put(
+        `${OTHER_BACKEND_BASE}policeIssueFine/${fineId}`,
+        { isPaid: true },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      console.log(`✅ Fine ${fineId} marked as paid, status:`, response.status);
     } catch (err) {
-      console.error("Failed to update fine:", err.message);
+      if (err.response) {
+        console.error(
+          "Failed to update fine:",
+          err.message,
+          err.response.data
+        );
+      } else {
+        console.error("Failed to update fine:", err.message);
+      }
     }
   }
 
