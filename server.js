@@ -100,7 +100,7 @@ app.post("/webhook", async (req, res) => {
     const { fineId, civilNIC } = session.metadata;
 
     try {
-      await axios.put(`${OTHER_BACKEND_BASE}/policeIssueFine/${fineId}`, {
+      await axios.put(`${OTHER_BACKEND_BASE}policeIssueFine/${fineId}`, {
         isPaid: true,
       });
       console.log(`✅ Fine ${fineId} marked as paid`);
