@@ -1,0 +1,27 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# TypeScript/Build
+dist/           # Compiled output (from tsc)
+*.tsbuildinfo   # TS incremental build cache
+
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# OS/System
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/       # Vercel deployment cache
+
+tms.txt
+tms.txt.pub
