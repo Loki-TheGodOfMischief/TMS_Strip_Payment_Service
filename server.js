@@ -65,8 +65,8 @@ app.post("/create-checkout-session", async (req, res) => {
       ],
       mode: "payment",
       metadata: { fineId, civilNIC },
-      success_url: "https://tms-server-rosy.vercel.app/payment-success",
-      cancel_url: "https://tms-server-rosy.vercel.app/payment-cancelled",
+      success_url: "https://tms-gamma-brown.vercel.app/#/payment-success",
+      cancel_url: "https://tms-gamma-brown.vercel.app/#/payment-cancelled",      
     });
 
     res.status(200).json({
