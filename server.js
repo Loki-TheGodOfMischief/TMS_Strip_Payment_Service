@@ -7,6 +7,11 @@ const bodyParser = require("body-parser");
 
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+if (!endpointSecret) {
+  return res.status(500).send("Webhook secret not configured");
+}
 
 app.use(cors());
 app.use(express.json());
@@ -83,7 +88,7 @@ app.post("/webhook", async (req, res) => {
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+      endpointSecret
     );
   } catch (err) {
     console.error("Webhook signature verification failed:", err.message);
